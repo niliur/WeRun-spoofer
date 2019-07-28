@@ -2,50 +2,24 @@ import frida
 import sys
 
 session = frida.get_usb_device().attach("com.tencent.mm")
+target = sys.argv[1]
 script = session.create_script("""
 
 
 var c = null;
-var target = 60000;
+var target = """ + target + """;
+var curSteps = 0;
 
-function shadyHooks(){
+
+function addSteps(){
 	Java.perform(function(){
 
-		addSteps(0);
 
-
-
-		c.onSensorChanged.implementation = function(event){
-			console.log(event.values.value[0]);
-			//spoofEvent.timestamp.value = event.timestamp.value;
-			//event.values.value[0] = 1066;
-			//console.log("sensor event");
-			//console.log(this.rjr.value + "rjr?");
-			//console.log(this.rjs.value + "rjs?");
-			this.onSensorChanged(event);
-			//console.log("worked?");
-			//console.log("sensor event after");
-			//console.log(this.rjr.value + "rjr?");
-			//console.log(this.rjs.value + "rjs?");
-		};
-	});
-		
-};
-
-function addSteps(curIter){
-	Java.perform(function(){
-
-		curIter = curIter !== undefined ? curIter : 0;
-
-
-
-
-		console.log("hooked");
 		var spoofEventConst = Java.use("android.hardware.SensorEvent");
 		var spoofEvent = spoofEventConst.$new(1);
 		var sys = Java.use("java.lang.System");
 		var curtime = sys.nanoTime();
-		var values = Java.array("float", [curIter]);
+		var values = Java.array("float", [curSteps]);
 		spoofEvent.values.value = values;
 		var timestamp = Java.use("java.lang.Long");
 		timestamp.value = curtime;
@@ -57,11 +31,14 @@ function addSteps(curIter){
 		c.onSensorChanged(spoofEvent);
 	});
 
-	if (curIter < target)
+	if (curSteps < target)
 	{
 		setTimeout(function(){
-			addSteps(curIter + 50);
+			addSteps(50);
+			curSteps += 50;
 		}, 1000);
+	}else{
+		console.log("Finished adding steps.");
 	}
 
 };
@@ -70,14 +47,10 @@ function addSteps(curIter){
 Java.perform(function (){
 	Java.choose("com.tencent.mm.plugin.sport.model.c", {
 		onMatch: function (inst){
-			console.log("Found instance: " + inst);
 			c = inst;
-			// should only be one of these
 		},
 		onComplete: function(){
-			console.log("Found all");
-			shadyHooks();
-
+			addSteps();
 		}
 	});
 });
